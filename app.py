@@ -1,9 +1,10 @@
-"""NMAMIT Event & Venue Booking — Flask + SQLite (stdlib), no other dependencies."""
+"""NMAMIT Event & Venue Booking — Flask on Postgres (DATABASE_URL, e.g. Vercel + Neon) or SQLite (local default)."""
 import os
 import re
 import secrets
 import smtplib
 import sqlite3
+from contextlib import contextmanager
 from datetime import date, datetime
 from email.message import EmailMessage
 from functools import wraps
@@ -13,7 +14,31 @@ from flask import Flask, abort, flash, g, jsonify, redirect, render_template, re
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load_env(path):
+    """Read KEY=value lines from .env (kept out of git). Real environment variables, e.g. Vercel's, take priority."""
+    if os.path.exists(path):
+        for line in open(path, encoding="utf-8"):
+            key, sep, val = line.strip().partition("=")
+            if sep and key and not key.startswith("#"):
+                os.environ.setdefault(key.strip(), val.strip().strip("\"'"))
+
+
+load_env(os.path.join(BASE, ".env"))
 DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE, "nmamit.db"))
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+PG = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+if PG:
+    import psycopg
+    from psycopg.rows import dict_row
+if os.environ.get("VERCEL") and not (PG and os.environ.get("SECRET_KEY")):
+    # serverless disks are wiped and every instance would mint its own session key
+    raise RuntimeError("On Vercel, set the DATABASE_URL (Postgres) and SECRET_KEY environment variables.")
+IntegrityError = psycopg.IntegrityError if PG else sqlite3.IntegrityError
+# Demo mode: every sign-up uses this code and no email is sent. Anyone can then claim any college
+# address, so leave it unset for real use.
+DEMO_OTP = os.environ.get("DEMO_OTP", "") if re.fullmatch(r"\d{6}", os.environ.get("DEMO_OTP", "")) else ""
 EMAIL_RE = re.compile(r"^[a-z0-9._%+-]+@(nmamit\.in|nitte\.edu\.in)$")
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 PHONE_RE = re.compile(r"^[6-9]\d{9}$")
@@ -30,13 +55,13 @@ DEPTS = [
     ("SCI", "Basic Sciences & Humanities"), ("ADMIN", "Administration / Office"), ("OTHER", "Other"),
 ]
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="public/static")  # public/ is also served straight from Vercel's CDN
 app.config.update(
     SECRET_KEY=os.environ.get("SECRET_KEY") or secrets.token_hex(32),
     SESSION_COOKIE_SAMESITE="Lax",  # with JSON-only API writes, this is the CSRF guard
     SESSION_COOKIE_HTTPONLY=True,
 )
-app.jinja_env.globals.update(DEPTS=DEPTS, DEPT_NAMES=dict(DEPTS), USER_TYPES=USER_TYPES)
+app.jinja_env.globals.update(DEPTS=DEPTS, DEPT_NAMES=dict(DEPTS), USER_TYPES=USER_TYPES, DEMO_OTP=DEMO_OTP)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users(
@@ -96,7 +121,36 @@ def seed(con):
                     " VALUES(2,?,?,?,?,?,?,?,?)", (vid, title, org, date.fromordinal(t + off).isoformat(), s, e, n, st))
 
 
+class PgConn:
+    """Lets the sqlite-style queries ('?' placeholders) run unchanged on Postgres."""
+
+    def __init__(self):
+        # prepare_threshold=None: required behind poolers like Neon's pgbouncer
+        self.con = psycopg.connect(DATABASE_URL, autocommit=True, row_factory=dict_row, prepare_threshold=None)
+
+    def execute(self, q, args=()):
+        return self.con.execute(q.replace("?", "%s"), args)
+
+    def executemany(self, q, rows):
+        with self.con.cursor() as c:
+            c.executemany(q.replace("?", "%s"), rows)
+
+    def close(self):
+        self.con.close()
+
+
 def init_db():
+    if PG:
+        con = PgConn()
+        with con.con.transaction():
+            con.execute("SELECT pg_advisory_xact_lock(0)")  # several cold starts may run this at once
+            for stmt in SCHEMA.replace("INTEGER PRIMARY KEY", "SERIAL PRIMARY KEY").split(";"):
+                if stmt.strip():
+                    con.execute(stmt)
+            if not con.execute("SELECT 1 FROM venues").fetchone():
+                seed(con)
+        con.close()
+        return
     con = sqlite3.connect(DB_PATH)
     for table, col, ddl in [("users", "utype", "TEXT"), ("users", "id_no", "TEXT"), ("users", "phone", "TEXT"),
                             ("venues", "incharge_id", "INTEGER REFERENCES users(id)")]:  # upgrade older DBs in place
@@ -112,10 +166,32 @@ def init_db():
 
 def db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH, isolation_level=None, timeout=10)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys=ON")
+        if PG:
+            g.db = PgConn()
+        else:
+            g.db = sqlite3.connect(DB_PATH, isolation_level=None, timeout=10)
+            g.db.row_factory = sqlite3.Row
+            g.db.execute("PRAGMA foreign_keys=ON")
     return g.db
+
+
+def scalar(q, args=()):
+    row = db().execute(q, args).fetchone()
+    return next(iter(row.values())) if PG else row[0]
+
+
+@contextmanager
+def venue_lock(vid):
+    """Serialize check-then-insert per venue so two requests can't grab the same slot."""
+    con = db()
+    if PG:
+        with con.con.transaction():
+            con.execute("SELECT pg_advisory_xact_lock(?)", (vid,))
+            yield
+    else:
+        with con:
+            con.execute("BEGIN IMMEDIATE")
+            yield
 
 
 @app.teardown_appcontext
@@ -252,8 +328,8 @@ def nav_counts():
     scope, args = review_scope()
     reviewer = g.user["role"] == "admin" or bool(db().execute(
         "SELECT 1 FROM venues v WHERE " + scope, args).fetchone())
-    pending = db().execute("SELECT COUNT(*) FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE b.status='pending'"
-                           " AND b.day>=? AND " + scope, (date.today().isoformat(), *args)).fetchone()[0]
+    pending = scalar("SELECT COUNT(*) FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE b.status='pending'"
+                     " AND b.day>=? AND " + scope, (date.today().isoformat(), *args))
     return dict(is_reviewer=reviewer, pending_count=pending)
 
 
@@ -280,6 +356,8 @@ def admin_required(f):
 
 def send_code(email, code):
     host = os.environ.get("SMTP_HOST")
+    if DEMO_OTP:
+        return  # verify page shows the shared code
     if not host:
         print(f"\n  [DEV] Verification code for {email}: {code}\n", flush=True)
         flash("Dev mode: no mail server configured, so the code was printed in the server terminal.", "info")
@@ -312,7 +390,7 @@ def register():
     if err:
         flash(err, "error")
         return render_template("register.html", form=f)
-    code = f"{secrets.randbelow(10 ** 6):06d}"
+    code = DEMO_OTP or f"{secrets.randbelow(10 ** 6):06d}"
     db().execute("INSERT INTO users(name,email,pw,utype,dept,id_no,phone,code) VALUES(?,?,?,?,?,?,?,?)"
                  " ON CONFLICT(email) DO UPDATE SET name=excluded.name, pw=excluded.pw, utype=excluded.utype,"
                  " dept=excluded.dept, id_no=excluded.id_no, phone=excluded.phone, code=excluded.code, tries=0",
@@ -370,7 +448,7 @@ def logout():
 @app.route("/")
 def index():
     today = date.today().isoformat()
-    one = lambda q, *a: db().execute(q, a).fetchone()[0]
+    one = lambda q, *a: scalar(q, a)
     stats = dict(venues=one("SELECT COUNT(*) FROM venues WHERE active=1"),
                  upcoming=one("SELECT COUNT(*) FROM bookings WHERE status='approved' AND day>=?", today),
                  today=one("SELECT COUNT(*) FROM bookings WHERE status='approved' AND day=?", today))
@@ -429,10 +507,10 @@ def approvals():
 @app.route("/admin")
 @admin_required
 def admin():
-    count = lambda q: db().execute(q, (date.today().isoformat(),)).fetchone()[0]
+    count = lambda q: scalar(q, (date.today().isoformat(),))
     stats = dict(pending=count("SELECT COUNT(*) FROM bookings WHERE status='pending' AND day>=?"),
                  upcoming=count("SELECT COUNT(*) FROM bookings WHERE status='approved' AND day>=?"),
-                 users=db().execute("SELECT COUNT(*) FROM users WHERE verified=1").fetchone()[0])
+                 users=scalar("SELECT COUNT(*) FROM users WHERE verified=1"))
     users = db().execute("SELECT id, name, email, utype, dept FROM users WHERE verified=1 ORDER BY name").fetchall()
     return render_template("admin.html", stats=stats, venues=venues(False), users=users)
 
@@ -465,8 +543,8 @@ def profile():
 
 
 def profile_extras():
-    stats = dict(db().execute("SELECT status, COUNT(*) FROM bookings WHERE user_id=? GROUP BY status",
-                              (g.user["id"],)).fetchall())
+    stats = {r["status"]: r["n"] for r in db().execute(
+        "SELECT status, COUNT(*) n FROM bookings WHERE user_id=? GROUP BY status", (g.user["id"],))}
     managed = db().execute("SELECT name, color FROM venues WHERE incharge_id=? ORDER BY name", (g.user["id"],)).fetchall()
     return dict(stats=stats, managed=managed)
 
@@ -486,7 +564,7 @@ def add_venue():
         flash("Venue added.", "success")
     except (ValueError, AssertionError):
         flash("Enter a venue name and a positive capacity.", "error")
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         flash("A venue with that name already exists.", "error")
     return redirect(url_for("admin") + "#venues")
 
@@ -500,7 +578,7 @@ def toggle_venue(vid):
 
 def verified_user(uid):
     """Id of a verified user, or None (= admin approves)."""
-    row = db().execute("SELECT id FROM users WHERE id=? AND verified=1", (uid,)).fetchone() if str(uid).isdigit() else None
+    row = db().execute("SELECT id FROM users WHERE id=? AND verified=1", (int(uid),)).fetchone() if str(uid).isdigit() else None
     return row["id"] if row else None
 
 
@@ -580,17 +658,15 @@ def api_book():
     if n > v["capacity"]:
         return jsonify(error=f"{v['name']} seats only {v['capacity']}. These venues fit {n} people:",
                        conflicts=[], suggestions=suggest(v, day, s, e, n)), 409
-    con = db()
-    with con:
-        con.execute("BEGIN IMMEDIATE")  # check + insert atomically so two requests can't grab the same slot
+    with venue_lock(vid):
         clash = conflicts(vid, day, s, e)
         if not clash:
             status = "approved" if can_review(vid) else "pending"  # admins / the venue's in-charge skip approval
-            bid = con.execute(
+            bid = scalar(
                 "INSERT INTO bookings(user_id,venue_id,title,description,organizer,day,start_t,end_t,attendees,status)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?)",
+                " VALUES(?,?,?,?,?,?,?,?,?,?) RETURNING id",
                 (g.user["id"], vid, title, str(d.get("description", "")).strip()[:1000],
-                 str(d.get("organizer", "")).strip()[:120], day, s, e, n, status)).lastrowid
+                 str(d.get("organizer", "")).strip()[:120], day, s, e, n, status))
     if clash:
         return jsonify(error=f"{v['name']} is already booked during that time.",
                        conflicts=[dict(title=c["title"], start=c["start_t"], end=c["end_t"], status=c["status"],

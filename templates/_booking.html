@@ -21,6 +21,6 @@
     {% if b.note %}<span class="note">Admin note: {{ b.note }}</span>{% endif %}
   </div>
   <div class="acts">
-    {% for label, action, cls in actions %}<button class="btn {{ cls }} btn-sm" onclick="act({{ b.id }}, '{{ action }}')">{{ label }}</button>{% endfor %}
+    {% for label, action, cls in actions %}<button class="btn {{ cls }} btn-sm" onclick="act({{ b.id }}, '{{ action }}', this)">{{ label }}</button>{% endfor %}
   </div>
 </div>

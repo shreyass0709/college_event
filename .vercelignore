@@ -1,0 +1,7 @@
+nmamit.db
+__pycache__/
+*.pyc
+.venv/
+test_app.py
+.env
+.env.*

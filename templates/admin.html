@@ -42,7 +42,7 @@
               </form>
             </td>
             <td><span class="pill {{ 'approved' if v.active else 'cancelled' }}">{{ 'Active' if v.active else 'Disabled' }}</span></td>
-            <td><form method="post" action="{{ url_for('toggle_venue', vid=v.id) }}"><button class="btn btn-sm {{ 'btn-red' if v.active else 'btn-outline' }}">{{ 'Disable' if v.active else 'Enable' }}</button></form></td>
+            <td><form method="post" action="{{ url_for('toggle_venue', vid=v.id) }}"{% if v.active %} data-confirm="Disable {{ v.name }}?|No new bookings can be made for it until you enable it again. Existing bookings stay." data-confirm-ok="Disable venue" data-danger{% endif %}><button class="btn btn-sm {{ 'btn-red' if v.active else 'btn-outline' }}">{{ 'Disable' if v.active else 'Enable' }}</button></form></td>
           </tr>
         {% endfor %}
         </tbody>

@@ -1,10 +1,18 @@
-"""Run:  python -m unittest test_app -v"""
+"""Run:  python -m unittest test_app -v
+On Postgres:  set TEST_DATABASE_URL to a THROWAWAY database. Its tables are dropped.
+Tests never touch DATABASE_URL from .env, so the real database is safe."""
 import os
 import tempfile
 import unittest
 from datetime import date, timedelta
 
 os.environ["DB_PATH"] = os.path.join(tempfile.mkdtemp(), "test.db")
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "")  # set before app loads .env, so .env can't override
+os.environ.pop("DEMO_OTP", None)
+if os.environ["DATABASE_URL"]:
+    import psycopg
+    with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as c:
+        c.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public")
 from app import app  # noqa: E402
 
 DAY = (date.today() + timedelta(days=10)).isoformat()
@@ -87,6 +95,13 @@ class BookingTest(unittest.TestCase):
         c.post("/profile", data={"action": "password", "current": "password1", "new": "newpass99", "confirm": "newpass99"})
         c2 = self.client("asha@nitte.edu.in", "newpass99")
         self.assertEqual(c2.get("/my").status_code, 200)
+
+    def test_simultaneous_requests_one_winner(self):
+        from concurrent.futures import ThreadPoolExecutor
+        clients = [self.client() for _ in range(8)]
+        with ThreadPoolExecutor(8) as ex:
+            codes = list(ex.map(lambda c: self.book(c, "18:00", "19:00", venue=8, n=10).status_code, clients))
+        self.assertEqual(sorted(codes), [201] + [409] * 7)
 
     def test_old_account_must_complete_profile(self):
         from app import db

@@ -11,7 +11,7 @@
 
 <section class="wrap book-layout">
   <div>
-    <form class="card form" id="bf" novalidate>
+    <form class="card form" id="bf" novalidate data-guard>
       <div class="field"><label for="title">Event title</label>
         <input id="title" name="title" maxlength="120" placeholder="e.g. Guest Lecture on Cloud Computing" required></div>
       <div class="field"><label for="venue_id">Venue</label>
@@ -98,18 +98,19 @@ function useSuggestion(s) {
 f.onsubmit = async e => {
   e.preventDefault();
   if (!f.reportValidity()) return;
-  const btn = $('#go'); btn.disabled = true;
+  const btn = $('#go'); btn.disabled = true; btn.classList.add('loading');
   const { ok, status, data } = await api('/api/bookings', Object.fromEntries(new FormData(f)));
-  btn.disabled = false;
+  btn.disabled = false; btn.classList.remove('loading');
   const clash = $('#clash');
   if (ok) {
+    delete f.dataset.dirty;
     f.classList.add('hidden'); clash.classList.add('hidden');
     const approved = data.status === 'approved';
     $('#done').classList.remove('hidden');
     $('#done').innerHTML = `<div class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></div>
       <h2>${approved ? 'Booked!' : 'Request sent!'}</h2>
       <p class="muted" style="margin:8px 0 22px">${esc(el('title').value)} · ${nice(el('day').value)}, ${t12(el('start').value)} – ${t12(el('end').value)}<br>
-      ${approved ? 'It is live on the common calendar.' : 'The slot is held for you while the admin reviews it.'}</p>
+      ${approved ? 'It is live on the common calendar.' : 'The slot is held for you while the venue in-charge reviews it.'}</p>
       <div class="hero-cta" style="justify-content:center"><a class="btn btn-navy" href="/calendar">View calendar</a><a class="btn btn-outline" href="/my">My bookings</a><a class="btn btn-ghost" href="/book">Book another</a></div>`;
     return;
   }

@@ -13,13 +13,14 @@
 
 <section class="wrap cal-layout">
   <aside class="card side">
-    <h3>Venues</h3>
+    <details class="vdetails" open><summary><h3>Venues</h3></summary>
     <div class="vlist">
       <label class="chk all"><input type="checkbox" id="allv" checked> All venues</label>
       {% for v in venues %}
       <label class="chk"><input type="checkbox" class="vf" value="{{ v.id }}" checked><i class="dot" style="background:{{ v.color }}"></i>{{ v.name }}</label>
       {% endfor %}
     </div>
+    </details>
     <h3>Legend</h3>
     <div class="legend">
       <span><i></i>Approved</span>
@@ -39,6 +40,7 @@
 </dialog>
 
 <script>
+if (matchMedia('(max-width: 760px)').matches) $('.vdetails').open = false;
 const boxes = [...document.querySelectorAll('.vf')], all = $('#allv');
 const only = new URLSearchParams(location.search).get('venue');
 if (only) { boxes.forEach(b => b.checked = b.value === only); all.checked = false; }
