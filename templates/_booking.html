@@ -1,0 +1,19 @@
+{# one booking row; expects `b`, `today`, and `actions` (list of (label, action, class)) #}
+<div class="bitem {{ 'past' if b.day < today }}">
+  <div class="datebox"><b>{{ b.day[8:] }}</b><span>{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][b.day[5:7]|int - 1] }}</span></div>
+  <div>
+    <h3>{{ b.title }} <span class="pill {{ b.status }}">{{ b.status }}</span></h3>
+    <div class="meta">
+      <span><i class="dot" style="background:{{ b.color }}"></i>{{ b.venue }}</span>
+      <span>🕒 {{ b.start_t }} – {{ b.end_t }}</span>
+      <span>👥 {{ b.attendees }}{% if b.capacity %} / {{ b.capacity }}{% endif %}</span>
+      {% if b.organizer %}<span>🏛 {{ b.organizer }}</span>{% endif %}
+      {% if b.uname %}<span>✉ {{ b.uname }} · {{ b.email }}</span>{% endif %}
+    </div>
+    {% if b.description %}<p class="desc">{{ b.description }}</p>{% endif %}
+    {% if b.note %}<span class="note">Admin note: {{ b.note }}</span>{% endif %}
+  </div>
+  <div class="acts">
+    {% for label, action, cls in actions %}<button class="btn {{ cls }} btn-sm" onclick="act({{ b.id }}, '{{ action }}')">{{ label }}</button>{% endfor %}
+  </div>
+</div>

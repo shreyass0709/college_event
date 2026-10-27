@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Book a Venue · NMAMIT{% endblock %}
+{% block content %}
+<section class="wrap page-head">
+  <div>
+    <p class="eyebrow">New booking</p>
+    <h1>Book a venue</h1>
+    <p class="muted">Bookable between {{ open }} and {{ close }}. {{ 'As an admin, your bookings are approved instantly.' if g.user.role == 'admin' else 'Your request will be reviewed by the admin. The slot is held for you meanwhile.' }}</p>
+  </div>
+</section>
+
+<section class="wrap book-layout">
+  <div>
+    <form class="card form" id="bf" novalidate>
+      <div class="field"><label for="title">Event title</label>
+        <input id="title" name="title" maxlength="120" placeholder="e.g. Guest Lecture on Cloud Computing" required></div>
+      <div class="field"><label for="venue_id">Venue</label>
+        <select id="venue_id" name="venue_id" required>
+          <option value="">Choose a venue…</option>
+          {% for v in venues %}<option value="{{ v.id }}" data-cap="{{ v.capacity }}">{{ v.name }} · {{ v.capacity }} seats</option>{% endfor %}
+        </select></div>
+      <div class="grid3">
+        <div class="field"><label for="day">Date</label><input id="day" name="day" type="date" required></div>
+        <div class="field"><label for="start">Start</label><input id="start" name="start" type="time" min="{{ open }}" max="{{ close }}" step="900" required></div>
+        <div class="field"><label for="end">End</label><input id="end" name="end" type="time" min="{{ open }}" max="{{ close }}" step="900" required></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label for="attendees">Expected attendees</label>
+          <input id="attendees" name="attendees" type="number" min="1" value="50" required>
+          <span class="warn-text hidden" id="capwarn"></span></div>
+        <div class="field"><label for="organizer">Organizing dept / club</label>
+          <input id="organizer" name="organizer" maxlength="120" value="{{ g.user.dept or '' }}" placeholder="e.g. ISE Department"></div>
+      </div>
+      <div class="field"><label for="description">Description <span class="muted">(optional)</span></label>
+        <textarea id="description" name="description" maxlength="1000" placeholder="What's the event about? Any special requirements?"></textarea></div>
+      <button class="btn btn-navy btn-block" id="go">{{ 'Book now' if g.user.role == 'admin' else 'Send booking request' }}</button>
+    </form>
+    <div class="card hidden success-box" id="done"></div>
+  </div>
+
+  <div class="book-side">
+    <div class="card clash hidden" id="clash"></div>
+    <div class="card">
+      <p class="eyebrow">Live availability</p>
+      <h3 id="av-title">Venue schedule</h3>
+      <div id="avail"><p class="muted" style="margin-top:8px">Pick a venue and date to see its schedule.</p></div>
+    </div>
+  </div>
+</section>
+
+<script>
+const f = $('#bf'), el = n => f.elements[n], q = new URLSearchParams(location.search);
+el('day').min = ymd(new Date());
+el('day').value = q.get('day') || ymd(new Date(Date.now() + 864e5));
+el('venue_id').value = q.get('venue') || '';
+el('start').value = q.get('start') || '10:00';
+el('end').value = q.get('end') || '11:00';
+
+const duration = () => Math.max(15, mins(el('end').value || '00:00') - mins(el('start').value || '00:00')) || 60;
+
+function checkCap() {
+  const opt = el('venue_id').selectedOptions[0], cap = +(opt?.dataset.cap || 0), n = +el('attendees').value;
+  const w = $('#capwarn');
+  w.classList.toggle('hidden', !(cap && n > cap));
+  w.textContent = `This venue seats only ${cap}.`;
+}
+
+async function refresh() {
+  checkCap();
+  const box = $('#avail'), vid = el('venue_id').value, day = el('day').value;
+  if (!vid || !day) { $('#av-title').textContent = 'Venue schedule'; box.innerHTML = '<p class="muted" style="margin-top:8px">Pick a venue and date to see its schedule.</p>'; return; }
+  const { ok, data } = await api(`/api/availability?day=${day}&venue=${vid}&duration=15`);
+  if (!ok) { box.innerHTML = `<p class="warn-text">${esc(data.error)}</p>`; return; }
+  const v = data.venues[0];
+  if (!v) { box.innerHTML = ''; return; }
+  $('#av-title').innerHTML = `<i class="dot" style="background:${v.color}"></i> ${esc(v.name)} · ${nice(day)}`;
+  box.innerHTML = '';
+  box.append(timeline(v, w => {
+    const s = mins(w.start), d = duration();
+    el('start').value = w.start; el('end').value = hhmm(Math.min(mins(w.end), s + d));
+    toast(`Picked ${t12(el('start').value)} – ${t12(el('end').value)}`, 'success');
+  }));
+  box.insertAdjacentHTML('beforeend', `<div class="tl-key"><span><i style="background:rgba(18,146,74,.3)"></i>Free (click to pick)</span><span><i style="background:${v.color}"></i>Booked</span><span><i style="background:${v.color};opacity:.5"></i>Pending</span></div>`);
+  box.insertAdjacentHTML('beforeend', v.busy.length
+    ? '<div class="busy-list">' + v.busy.map(b => `<div class="busy-item"><time>${t12(b.start)} – ${t12(b.end)}</time><span>${esc(b.title)}</span><span class="pill ${b.status}" style="margin-left:auto">${b.status}</span></div>`).join('') + '</div>'
+    : `<p class="muted" style="margin-top:12px">No bookings yet — the whole day is open${v.free.length ? '' : ' (but it has already passed)'}.</p>`);
+}
+['venue_id', 'day'].forEach(n => el(n).addEventListener('change', refresh));
+el('attendees').addEventListener('input', checkCap);
+refresh();
+
+function useSuggestion(s) {
+  el('venue_id').value = s.venue_id; el('day').value = s.day; el('start').value = s.start; el('end').value = s.end;
+  $('#clash').classList.add('hidden'); refresh();
+  toast(`Switched to ${s.venue}, ${t12(s.start)} – ${t12(s.end)}. Submit when ready.`, 'success');
+}
+
+f.onsubmit = async e => {
+  e.preventDefault();
+  if (!f.reportValidity()) return;
+  const btn = $('#go'); btn.disabled = true;
+  const { ok, status, data } = await api('/api/bookings', Object.fromEntries(new FormData(f)));
+  btn.disabled = false;
+  const clash = $('#clash');
+  if (ok) {
+    f.classList.add('hidden'); clash.classList.add('hidden');
+    const approved = data.status === 'approved';
+    $('#done').classList.remove('hidden');
+    $('#done').innerHTML = `<div class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></div>
+      <h2>${approved ? 'Booked!' : 'Request sent!'}</h2>
+      <p class="muted" style="margin:8px 0 22px">${esc(el('title').value)} · ${nice(el('day').value)}, ${t12(el('start').value)} – ${t12(el('end').value)}<br>
+      ${approved ? 'It is live on the common calendar.' : 'The slot is held for you while the admin reviews it.'}</p>
+      <div class="hero-cta" style="justify-content:center"><a class="btn btn-navy" href="/calendar">View calendar</a><a class="btn btn-outline" href="/my">My bookings</a><a class="btn btn-ghost" href="/book">Book another</a></div>`;
+    return;
+  }
+  if (status !== 409) { clash.classList.add('hidden'); return toast(data.error, 'error'); }
+  const s = data.suggestions, opts = [...s.same_venue, ...s.other_venues];
+  clash.innerHTML = `<p class="eyebrow" style="color:var(--bad)">Can't book this slot</p><h3>${esc(data.error)}</h3>` +
+    (data.conflicts.length ? '<div class="busy-list">' + data.conflicts.map(c => `<div class="busy-item"><time>${t12(c.start)} – ${t12(c.end)}</time><span>${esc(c.title)} <span class="muted">by ${esc(c.by)}</span></span><span class="pill ${c.status}" style="margin-left:auto">${c.status}</span></div>`).join('') + '</div>' : '') +
+    (opts.length ? `<p style="margin-top:16px;font-weight:700;font-size:.85rem">✨ Smart suggestions — click one to use it:</p><div class="sugg">` +
+      s.same_venue.map((x, i) => `<button type="button" data-i="${i}"><b>${t12(x.start)} – ${t12(x.end)}</b>Same venue, nearest free time</button>`).join('') +
+      s.other_venues.map((x, i) => `<button type="button" data-i="${s.same_venue.length + i}"><b>${esc(x.venue)}</b>${x.capacity} seats · free at that time</button>`).join('') + '</div>'
+    : '<p class="muted" style="margin-top:12px">No alternatives free on this day. Try another date in the Slot Finder.</p>');
+  clash.querySelectorAll('.sugg button').forEach(b => b.onclick = () => useSuggestion(opts[+b.dataset.i]));
+  clash.classList.remove('hidden');
+  clash.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+</script>
+{% endblock %}

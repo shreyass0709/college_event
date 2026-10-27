@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Venues · NMAMIT{% endblock %}
+{% block content %}
+<section class="wrap">
+  <div class="section-title"><h2>Venues</h2><span class="muted">{{ venues|length }} bookable spaces</span></div>
+  <div class="venue-grid">
+    {% for v in venues %}
+    <div class="venue">
+      <div class="circle" style="background:{{ v.color }}">{{ (v.name.replace('-', ' ').split()|map('first')|join)[:2] }}</div>
+      <h3>{{ v.name }}</h3>
+      <p class="muted">{{ v.building }} · {{ v.capacity }} seats</p>
+      <div class="chips">{% for f in v.facilities.split(',') if f %}<span class="chip">{{ f }}</span>{% endfor %}</div>
+      <div class="btns">
+        <a class="btn btn-outline btn-sm" href="{{ url_for('calendar', venue=v.id) }}">Schedule</a>
+        <a class="btn btn-yellow btn-sm" href="{{ url_for('book', venue=v.id) }}">Book</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

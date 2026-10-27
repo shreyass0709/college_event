@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% set hide_tabs = True %}
+{% block title %}Verify email · NMAMIT Venue Booking{% endblock %}
+{% block content %}
+<div class="auth">
+  <div class="auth-art" style="background-image:url('{{ url_for('static', filename='img/campus-aerial.jpg') }}')">
+    <div class="bar"></div>
+    <h2>One last step.</h2>
+    <p>Verifying your college email keeps the calendar for NMAMIT people only.</p>
+  </div>
+  <div class="auth-form">
+    <div class="auth-card">
+      <p class="eyebrow">Email verification</p>
+      <h1>Enter your code</h1>
+      <p class="sub">We sent a 6-digit code to <b>{{ email }}</b>.</p>
+      <form class="form" method="post">
+        <input class="code-input" name="code" inputmode="numeric" pattern="\d{6}" maxlength="6" required autofocus autocomplete="one-time-code" aria-label="6-digit code">
+        <button class="btn btn-navy btn-block">Verify &amp; continue</button>
+      </form>
+      <p class="auth-foot">Wrong email? <a href="{{ url_for('register') }}">Register again</a></p>
+    </div>
+  </div>
+</div>
+{% endblock %}

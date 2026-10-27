@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% set hide_tabs = True %}
+{% block title %}NMAMIT · Campus Event & Venue Booking{% endblock %}
+{% block content %}
+<section class="hero">
+  <img src="{{ url_for('static', filename='img/campus-front.webp') }}" alt="NMAMIT main campus building">
+  <div class="hero-band">
+    <div>
+      <h1>Campus Event &amp; Venue Booking</h1>
+      <p>One common calendar for every auditorium, seminar hall and ground at NMAMIT. See what's free, book in seconds, get approved online.</p>
+      <div class="hero-cta">
+        {% if g.user %}
+          <a class="btn btn-yellow" href="{{ url_for('calendar') }}">Open Calendar</a>
+          <a class="btn btn-outline" href="{{ url_for('finder') }}">Find a Free Slot</a>
+        {% else %}
+          <a class="btn btn-yellow" href="{{ url_for('register') }}">Get Started</a>
+          <a class="btn btn-outline" href="{{ url_for('login') }}">Log In</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div class="stat">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2 8v2h20V8L12 3zM4 12v6H3v3h18v-3h-1v-6h-3v6h-2v-6h-2v6h-2v-6H8v6H7v-6H4z"/></svg>
+        <div><span>Venues</span><b>{{ stats.venues }}</b></div>
+      </div>
+      <div class="stat">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2h2v2h6V2h2v2h3a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3V2zm12 8H5v9h14v-9zm-9 2v5H7v-5h3z"/></svg>
+        <div><span>Upcoming Events</span><b>{{ stats.upcoming }}</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="section-title"><h2>How it works</h2></div>
+  <div class="steps">
+    <div class="step">
+      <div class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></div>
+      <h3>Sign in with college email</h3>
+      <p>Only verified <b>@nmamit.in</b> and <b>@nitte.edu.in</b> accounts can view and book. No outsiders, no spam.</p>
+      <a class="btn btn-outline" href="{{ url_for('register') if not g.user else url_for('calendar') }}">{{ 'Register' if not g.user else 'Signed in' }}</a>
+    </div>
+    <div class="step">
+      <div class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h3M14 13h3M7 17h3"/></svg></div>
+      <h3>Check the common calendar</h3>
+      <p>Every booking across campus in one place: month, week, day or list view, filtered by venue.</p>
+      <a class="btn btn-outline" href="{{ url_for('calendar') }}">View Calendar</a>
+    </div>
+    <div class="step">
+      <div class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></div>
+      <h3>Book &amp; get approved</h3>
+      <p>Double-bookings are impossible. Your request goes to the admin and you can track its status live.</p>
+      <a class="btn btn-yellow" href="{{ url_for('book') }}">Book a Venue</a>
+    </div>
+  </div>
+
+  <div class="feature">
+    <div>
+      <span class="badge-new">Highlight feature</span>
+      <h2>Smart Slot Finder — stop hunting for a free hall</h2>
+      <p class="muted" style="margin-top:10px">Tell it the date, how long, and how many people. It scans every venue and shows exactly where and when your event fits.</p>
+      <ul>
+        <li>Checks capacity and facilities (projector, stage, AC…) automatically</li>
+        <li>Ranks the best-fit venue first, so a 40-person talk doesn't take the main auditorium</li>
+        <li>If your slot clashes, it instantly suggests the nearest free time or another free venue</li>
+      </ul>
+      <a class="btn btn-navy" href="{{ url_for('finder') }}">Try the Slot Finder</a>
+    </div>
+    <div class="card">
+      <div class="vcard-head"><h3><i class="dot" style="background:#0ca678"></i>Seminar Hall - ISE</h3><span class="best">Best fit</span></div>
+      <p class="muted" style="font-size:.8rem">ISE Block · 120 seats</p>
+      <div id="demo-tl"></div>
+      <div class="tl-key"><span><i style="background:rgba(18,146,74,.3)"></i>Free — click to book</span><span><i style="background:#0ca678"></i>Booked</span></div>
+    </div>
+  </div>
+</div>
+
+<section class="photo-band">
+  <img src="{{ url_for('static', filename='img/campus-aerial.jpg') }}" alt="Aerial view of the NMAMIT campus, Nitte">
+  <div>
+    <p class="eyebrow" style="color:var(--yellow)">NMAM Institute of Technology, Nitte</p>
+    <h2>Every hall on campus, one calendar away.</h2>
+    <p>Built for faculty, clubs and students of NMAMIT to plan events without clashes or paperwork.</p>
+    <div><a class="btn btn-yellow" href="{{ url_for('calendar') if g.user else url_for('register') }}">{{ 'Open Calendar' if g.user else 'Create your account' }}</a></div>
+  </div>
+</section>
+
+<script>
+  $('#demo-tl').append(timeline({ color: '#0ca678',
+    busy: [{ start: '09:00', end: '11:00', title: 'IEEE Meetup', status: 'approved' }, { start: '14:00', end: '16:30', title: 'Guest Lecture', status: 'pending' }],
+    free: [{ start: '07:00', end: '09:00' }, { start: '11:00', end: '14:00' }, { start: '16:30', end: '21:00' }] },
+    () => location.href = '{{ url_for("finder") }}'));
+</script>
+{% endblock %}

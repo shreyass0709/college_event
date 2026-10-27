@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}My Bookings · NMAMIT{% endblock %}
+{% block content %}
+<section class="wrap">
+  <div class="section-title"><h2>My Bookings</h2><a class="btn btn-navy btn-sm" href="{{ url_for('book') }}">+ New booking</a></div>
+  {% if rows %}
+  <div class="blist">
+    {% for b in rows %}
+      {% set actions = [('Cancel', 'cancel', 'btn-red')] if b.status in ('pending', 'approved') and b.day >= today else [] %}
+      {% include "_booking.html" %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card empty"><b>No bookings yet</b>Find a free slot and make your first booking.<br><br>
+    <a class="btn btn-yellow" href="{{ url_for('finder') }}">Open Slot Finder</a></div>
+  {% endif %}
+</section>
+{% endblock %}

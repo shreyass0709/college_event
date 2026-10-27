@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Smart Slot Finder · NMAMIT{% endblock %}
+{% block content %}
+<section class="wrap page-head">
+  <div>
+    <p class="eyebrow">✨ Smart Slot Finder</p>
+    <h1>Where and when can my event happen?</h1>
+    <p class="muted">Enter the date, duration and headcount. We check every venue's capacity, facilities and schedule, then rank the best fit first.</p>
+  </div>
+</section>
+
+<section class="wrap">
+  <form class="card finder-form" id="ff">
+    <div class="field"><label for="day">Date</label><input id="day" name="day" type="date" required></div>
+    <div class="field"><label for="duration">Duration</label>
+      <select id="duration" name="duration">
+        {% for m, l in [(30,'30 min'),(60,'1 hour'),(90,'1.5 hours'),(120,'2 hours'),(180,'3 hours'),(240,'4 hours'),(360,'6 hours'),(480,'Full day (8h)')] %}
+        <option value="{{ m }}" {{ 'selected' if m == 120 }}>{{ l }}</option>{% endfor %}
+      </select></div>
+    <div class="field"><label for="attendees">Attendees</label><input id="attendees" name="attendees" type="number" min="1" value="60" required></div>
+    <div class="field"><label for="facility">Needs</label>
+      <select id="facility" name="facility"><option value="">Anything</option>
+        {% for x in facilities %}<option>{{ x }}</option>{% endfor %}
+      </select></div>
+    <button class="btn btn-navy">Find slots</button>
+  </form>
+
+  <p class="summary" id="summary"></p>
+  <div class="results" id="results"></div>
+</section>
+
+<script>
+const ff = $('#ff'), q = new URLSearchParams(location.search);
+ff.day.min = ymd(new Date());
+ff.day.value = q.get('day') || ymd(new Date(Date.now() + 864e5));
+ff.onsubmit = e => { e.preventDefault(); run(); };
+['day', 'duration', 'facility'].forEach(n => ff[n].addEventListener('change', run));
+
+async function run() {
+  if (!ff.reportValidity()) return;
+  const params = new URLSearchParams(new FormData(ff)), day = ff.day.value, dur = +ff.duration.value, n = +ff.attendees.value;
+  history.replaceState(null, '', '?' + params);
+  const { ok, data } = await api('/api/availability?' + params);
+  const res = $('#results'); res.innerHTML = '';
+  if (!ok) return toast(data.error, 'error');
+  const fits = data.venues.filter(v => v.free.length);
+  const durLabel = ff.duration.selectedOptions[0].text;
+  $('#summary').innerHTML = fits.length
+    ? `<b>${fits.length}</b> venue${fits.length > 1 ? 's' : ''} can host <b>${n}</b> people for <b>${durLabel}</b> on <b>${nice(day)}</b>.`
+    : `<b>No venue</b> fits ${n} people for ${durLabel} on ${nice(day)}${ff.facility.value ? ' with ' + esc(ff.facility.value) : ''}. Try another date, a shorter duration or fewer requirements.`;
+  if (!data.venues.length) {
+    res.innerHTML = `<div class="card empty"><b>No venue is big enough</b>The largest venues don't match these requirements.</div>`;
+    return;
+  }
+  const go = (v, s) => location.href = `/book?venue=${v.id}&day=${day}&start=${s}&end=${hhmm(mins(s) + dur)}`;
+  data.venues.forEach((v, i) => {
+    const c = document.createElement('article');
+    c.className = 'vcard' + (v.free.length ? '' : ' full');
+    c.style.animationDelay = i * 40 + 'ms';
+    c.innerHTML = `<div class="vcard-head"><h3><i class="dot" style="background:${v.color}"></i>${esc(v.name)} ${i === 0 && v.free.length ? '<span class="best">Best fit</span>' : ''}</h3>
+        <span class="muted">${esc(v.building)} · ${v.capacity} seats</span></div>
+      <div class="slots" style="gap:6px">${v.facilities.map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div>`;
+    c.append(timeline(v, w => go(v, w.start)));
+    c.insertAdjacentHTML('beforeend', v.free.length
+      ? `<div class="slots">${v.free.map(w => `<a href="#" data-s="${w.start}">${t12(w.start)} – ${t12(w.end)}</a>`).join('')}</div>`
+      : `<span class="muted" style="font-size:.82rem">No free ${durLabel} window on this day.</span>`);
+    c.querySelectorAll('.slots a').forEach(a => a.onclick = e => { e.preventDefault(); go(v, a.dataset.s); });
+    res.append(c);
+  });
+}
+run();
+</script>
+{% endblock %}

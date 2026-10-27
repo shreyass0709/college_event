@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% set hide_tabs = True %}
+{% block title %}Register · NMAMIT Venue Booking{% endblock %}
+{% block content %}
+<div class="auth">
+  <div class="auth-art" style="background-image:url('{{ url_for('static', filename='img/campus-front.webp') }}')">
+    <div class="bar"></div>
+    <h2>Plan your next event without the clashes.</h2>
+    <p>Open to everyone with an <b>@nmamit.in</b> or <b>@nitte.edu.in</b> email: faculty, staff, clubs and students.</p>
+  </div>
+  <div class="auth-form">
+    <div class="auth-card">
+      <p class="eyebrow">NMAMIT Venue Booking</p>
+      <h1>Create account</h1>
+      <p class="sub">We'll send a 6-digit code to verify your email.</p>
+      <form class="form" method="post">
+        <div class="field"><label for="name">Full name</label>
+          <input id="name" name="name" value="{{ form.get('name', '') }}" required autocomplete="name"></div>
+        <div class="field"><label for="email">College email</label>
+          <input id="email" name="email" type="email" value="{{ form.get('email', '') }}" placeholder="4nm22is001@nmamit.in" required
+                 pattern=".+@(nmamit\.in|nitte\.edu\.in)" title="Use your @nmamit.in or @nitte.edu.in email" autocomplete="username"></div>
+        <div class="field"><label for="dept">Department / Club</label>
+          <input id="dept" name="dept" value="{{ form.get('dept', '') }}" placeholder="e.g. ISE, CSE, IEEE SB"></div>
+        <div class="field"><label for="password">Password</label>
+          <input id="password" name="password" type="password" minlength="8" required autocomplete="new-password">
+          <small>At least 8 characters.</small></div>
+        <button class="btn btn-navy btn-block">Send verification code</button>
+      </form>
+      <p class="auth-foot">Already registered? <a href="{{ url_for('login') }}">Log in</a></p>
+    </div>
+  </div>
+</div>
+{% endblock %}

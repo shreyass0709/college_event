@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Common Calendar · NMAMIT{% endblock %}
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>{% endblock %}
+{% block content %}
+<section class="wrap page-head">
+  <div>
+    <p class="eyebrow">Common Calendar</p>
+    <h1>Everything happening on campus</h1>
+    <p class="muted">Drag across an empty time in week or day view to book it. Click any event for details.</p>
+  </div>
+  <a class="btn btn-yellow" href="{{ url_for('finder') }}">Find a free slot</a>
+</section>
+
+<section class="wrap cal-layout">
+  <aside class="card side">
+    <h3>Venues</h3>
+    <div class="vlist">
+      <label class="chk all"><input type="checkbox" id="allv" checked> All venues</label>
+      {% for v in venues %}
+      <label class="chk"><input type="checkbox" class="vf" value="{{ v.id }}" checked><i class="dot" style="background:{{ v.color }}"></i>{{ v.name }}</label>
+      {% endfor %}
+    </div>
+    <h3>Legend</h3>
+    <div class="legend">
+      <span><i></i>Approved</span>
+      <span><i class="p"></i>Pending approval</span>
+    </div>
+  </aside>
+  <div class="card calcard"><div id="cal"></div></div>
+</section>
+
+<dialog class="modal" id="ev">
+  <div class="modal-top" id="ev-top"><span class="pill" id="ev-status"></span><h3 id="ev-title"></h3></div>
+  <div class="modal-body" id="ev-body"></div>
+  <div class="modal-actions">
+    <button class="btn btn-red btn-sm hidden" id="ev-cancel">Cancel booking</button>
+    <button class="btn btn-navy btn-sm" onclick="this.closest('dialog').close()">Close</button>
+  </div>
+</dialog>
+
+<script>
+const boxes = [...document.querySelectorAll('.vf')], all = $('#allv');
+const only = new URLSearchParams(location.search).get('venue');
+if (only) { boxes.forEach(b => b.checked = b.value === only); all.checked = false; }
+const selected = () => boxes.filter(b => b.checked).map(b => b.value).join(',');
+all.onchange = () => { boxes.forEach(b => b.checked = all.checked); cal.refetchEvents(); };
+boxes.forEach(b => b.onchange = () => { all.checked = boxes.every(x => x.checked); cal.refetchEvents(); });
+
+const small = innerWidth < 760;
+const cal = new FullCalendar.Calendar($('#cal'), {
+  initialView: small ? 'listWeek' : 'timeGridWeek',
+  headerToolbar: small ? { left: 'prev,next', center: 'title', right: 'listWeek,dayGridMonth' }
+                       : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
+  buttonText: { today: 'Today', month: 'Month', week: 'Week', day: 'Day', list: 'List' },
+  firstDay: 1, height: 'auto', allDaySlot: false, nowIndicator: true,
+  slotMinTime: '07:00:00', slotMaxTime: '21:00:00', scrollTime: '08:00:00',
+  eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
+  selectable: true, selectMirror: true, dayMaxEvents: 3,
+  events: (info, ok, fail) => api(`/api/events?start=${info.startStr}&end=${info.endStr}&venues=${selected()}`)
+    .then(r => r.ok ? ok(r.data) : fail(r.data.error)),
+  select: s => {
+    if (s.allDay) return cal.changeView('timeGridDay', s.start);
+    if (s.start < new Date()) return toast("That time is in the past.", 'error');
+    if (ymd(s.start) !== ymd(new Date(s.end - 1))) return toast('Bookings are for a single day. Select within one day.', 'error');
+    location.href = `/book?day=${ymd(s.start)}&start=${hm(s.start)}&end=${hm(s.end)}`;
+  },
+  eventClick: ({ event }) => showEvent(event),
+});
+cal.render();
+
+function showEvent(e) {
+  const p = e.extendedProps;
+  $('#ev-top').style.background = e.backgroundColor;
+  $('#ev-status').className = 'pill ' + p.status; $('#ev-status').textContent = p.status;
+  $('#ev-title').textContent = e.title;
+  const row = (k, v) => v ? `<div class="row"><b>${k}</b><span>${esc(v)}</span></div>` : '';
+  $('#ev-body').innerHTML =
+    row('Venue', p.venue) +
+    row('When', `${e.start.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}, ${t12(hm(e.start))} – ${t12(hm(e.end))}`) +
+    row('Organizer', p.organizer) + row('Attendees', p.attendees) +
+    row('Booked by', `${p.by} (${p.email})`) + row('About', p.description);
+  const c = $('#ev-cancel');
+  c.classList.toggle('hidden', !(p.mine || {{ 'true' if g.user.role == 'admin' else 'false' }}) || e.start < new Date());
+  c.onclick = () => act(e.id, 'cancel');
+  $('#ev').showModal();
+}
+$('#ev').onclick = e => { if (e.target.id === 'ev') e.target.close(); };
+</script>
+{% endblock %}

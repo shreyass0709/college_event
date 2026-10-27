@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}NMAMIT Venue Booking{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/logo.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <a class="brand" href="{{ url_for('index') }}" aria-label="NMAMIT Venue Booking home">
+      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="NITTE (Deemed to be University)">
+      <span class="brand-div"></span>
+      <span class="brand-name">NMAM INSTITUTE<br>OF TECHNOLOGY</span>
+    </a>
+    <div class="actions">
+      {% if g.user %}
+        <a class="btn btn-navy hide-sm" href="{{ url_for('book') }}">Book a Venue</a>
+        <div class="user">
+          <span class="avatar">{{ (g.user.name.split()|map('first')|join|upper)[:2] }}</span>
+          <span class="user-meta"><b>{{ g.user.name }}</b>{{ 'Admin' if g.user.role == 'admin' else g.user.dept or 'Member' }} · <a href="{{ url_for('logout') }}">Log out</a></span>
+        </div>
+      {% else %}
+        <a class="btn btn-ghost" href="{{ url_for('login') }}">Log in</a>
+        <a class="btn btn-navy" href="{{ url_for('register') }}">Register</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+{% if g.user and not hide_tabs %}
+{% set ep = request.endpoint %}
+<div class="tabsbar">
+  <nav class="wrap tabs" aria-label="Main">
+    <a href="{{ url_for('calendar') }}" class="{{ 'on' if ep == 'calendar' }}">Common Calendar</a>
+    <a href="{{ url_for('book') }}" class="{{ 'on' if ep == 'book' }}">Book a Venue</a>
+    <a href="{{ url_for('finder') }}" class="{{ 'on' if ep == 'finder' }}">Smart Slot Finder</a>
+    <a href="{{ url_for('venue_list') }}" class="{{ 'on' if ep == 'venue_list' }}">Venues</a>
+    <a href="{{ url_for('my_bookings') }}" class="{{ 'on' if ep == 'my_bookings' }}">My Bookings</a>
+    {% if g.user.role == 'admin' %}<a href="{{ url_for('admin') }}" class="{{ 'on' if ep == 'admin' }}">Admin Panel</a>{% endif %}
+    <a href="{{ url_for('logout') }}">Log Out</a>
+  </nav>
+</div>
+{% endif %}
+
+{% with msgs = get_flashed_messages(with_categories=true) %}
+  {% if msgs %}<div class="flashes">{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}</div>{% endif %}
+{% endwith %}
+
+<main>{% block content %}{% endblock %}</main>
+
+<footer>
+  <div class="wrap">
+    <span><b>NMAM Institute of Technology</b>, Nitte (Deemed to be University) · Nitte, Karkala, Udupi, Karnataka</span>
+    <span>Campus Event &amp; Venue Booking · <i>Only for @nmamit.in &amp; @nitte.edu.in</i></span>
+  </div>
+</footer>
+</body>
+</html>
