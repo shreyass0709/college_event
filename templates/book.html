@@ -5,7 +5,7 @@
   <div>
     <p class="eyebrow">New booking</p>
     <h1>Book a venue</h1>
-    <p class="muted">Bookable between {{ open }} and {{ close }}. {{ 'As an admin, your bookings are approved instantly.' if g.user.role == 'admin' else 'Your request will be reviewed by the admin. The slot is held for you meanwhile.' }}</p>
+    <p class="muted">Bookable between {{ open }} and {{ close }}. {{ 'As an admin, your bookings are approved instantly.' if g.user.role == 'admin' else "Your request goes to the venue's in-charge for approval. The slot is held for you meanwhile." }}</p>
   </div>
 </section>
 
@@ -74,7 +74,7 @@ async function refresh() {
   const v = data.venues[0];
   if (!v) { box.innerHTML = ''; return; }
   $('#av-title').innerHTML = `<i class="dot" style="background:${v.color}"></i> ${esc(v.name)} · ${nice(day)}`;
-  box.innerHTML = '';
+  box.innerHTML = `<p class="muted" style="font-size:.8rem;margin:2px 0 6px">Approved by: <b>${esc(v.incharge)}</b></p>`;
   box.append(timeline(v, w => {
     const s = mins(w.start), d = duration();
     el('start').value = w.start; el('end').value = hhmm(Math.min(mins(w.end), s + d));

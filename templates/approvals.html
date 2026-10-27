@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Approvals · NMAMIT{% endblock %}
+{% block content %}
+{% set today = '0000' %}
+<section class="wrap">
+  <div class="section-title"><h2>Approvals</h2>
+    <span class="muted">{{ 'All venues (admin)' if g.user.role == 'admin' else 'Venues you are in-charge of' }}</span></div>
+  {% if g.user.role != 'admin' %}
+  <div class="chips" style="margin-bottom:8px">{% for v in managed %}<span class="chip"><i class="dot" style="background:{{ v.color }};width:8px;height:8px"></i> {{ v.name }}</span>{% endfor %}</div>
+  {% endif %}
+
+  <div class="section-title"><h2>Pending requests</h2><span class="muted">{{ pending|length }} waiting</span></div>
+  {% if pending %}
+  <div class="blist">
+    {% for b in pending %}
+      {% set actions = [('Approve', 'approve', 'btn-green'), ('Reject', 'reject', 'btn-red')] %}
+      {% include "_booking.html" %}
+    {% endfor %}
+  </div>
+  {% else %}<div class="card empty"><b>All caught up 🎉</b>No requests waiting for your review.</div>{% endif %}
+
+  <div class="section-title"><h2>Upcoming approved events</h2></div>
+  {% if upcoming %}
+  <div class="blist">
+    {% for b in upcoming %}
+      {% set actions = [('Cancel', 'cancel', 'btn-red')] %}
+      {% include "_booking.html" %}
+    {% endfor %}
+  </div>
+  {% else %}<div class="card empty"><b>Nothing scheduled</b>Approved upcoming events will appear here.</div>{% endif %}
+</section>
+{% endblock %}

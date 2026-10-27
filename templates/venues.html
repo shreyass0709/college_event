@@ -9,6 +9,7 @@
       <div class="circle" style="background:{{ v.color }}">{{ (v.name.replace('-', ' ').split()|map('first')|join)[:2] }}</div>
       <h3>{{ v.name }}</h3>
       <p class="muted">{{ v.building }} · {{ v.capacity }} seats</p>
+      <p class="incharge">In-charge: <b>{{ v.iname or 'Admin' }}</b></p>
       <div class="chips">{% for f in v.facilities.split(',') if f %}<span class="chip">{{ f }}</span>{% endfor %}</div>
       <div class="btns">
         <a class="btn btn-outline btn-sm" href="{{ url_for('calendar', venue=v.id) }}">Schedule</a>

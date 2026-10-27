@@ -55,6 +55,47 @@ class BookingTest(unittest.TestCase):
         events = c.get(f"/api/events?start={DAY}&end=9999-01-01&venues=5").json
         self.assertEqual(len(events), 3)
 
+    def test_incharge(self):
+        c, ic = self.client(), self.client("incharge@nmamit.in", "Incharge@123")
+        self.assertEqual(c.get("/approvals").status_code, 403)
+        self.assertIn(b"Project Expo Briefing", ic.get("/approvals").data)  # seeded pending on ISE hall
+        mine = self.book(c, "09:00", "10:00", venue=3).json["id"]       # ISE hall: in-charge's venue
+        other = self.book(c, "09:00", "10:00", venue=4).json["id"]      # CSE hall: admin's
+        self.assertEqual(ic.post(f"/api/bookings/{other}/status", json={"action": "approve"}).status_code, 403)
+        self.assertEqual(ic.post(f"/api/bookings/{mine}/status", json={"action": "approve"}).json["status"], "approved")
+        self.assertEqual(self.book(ic, "11:00", "12:00", venue=7).json["status"], "approved")  # own venue: instant
+        # admin hands CSE hall to the in-charge too
+        a = self.client("admin@nmamit.in", "Admin@123")
+        a.post("/admin/venues/4/incharge", data={"incharge_id": "3"})
+        self.assertEqual(ic.post(f"/api/bookings/{other}/status", json={"action": "reject", "note": "x"}).json["status"], "rejected")
+
+    def test_register_and_profile(self):
+        c = app.test_client()
+        base = dict(name="Asha K", email="asha@nitte.edu.in", password="password1", utype="Student", dept="ISE",
+                    id_no="nnm23is010", phone="+91 98450 12345")
+        self.assertIn(b"valid 10-digit", c.post("/register", data={**base, "phone": "12345"}).data)
+        self.assertIn(b"choose your department", c.post("/register", data={**base, "dept": "XYZ"}).data)
+        self.assertEqual(c.post("/register", data=base).status_code, 302)
+        from app import db
+        with app.app_context():
+            u = db().execute("SELECT * FROM users WHERE email='asha@nitte.edu.in'").fetchone()
+        self.assertEqual((u["id_no"], u["phone"]), ("NNM23IS010", "9845012345"))
+        c.post("/verify", data={"code": u["code"]})
+        self.assertEqual(c.get("/calendar").status_code, 200)
+        c.post("/profile", data={**base, "name": "Asha Kumari", "action": "profile"})
+        self.assertIn(b"Asha Kumari", c.get("/profile").data)
+        c.post("/profile", data={"action": "password", "current": "password1", "new": "newpass99", "confirm": "newpass99"})
+        c2 = self.client("asha@nitte.edu.in", "newpass99")
+        self.assertEqual(c2.get("/my").status_code, 200)
+
+    def test_old_account_must_complete_profile(self):
+        from app import db
+        with app.app_context():
+            db().execute("INSERT INTO users(name,email,pw,verified) VALUES('Old','old@nmamit.in',"
+                         "(SELECT pw FROM users WHERE id=2),1)")
+        c = self.client("old@nmamit.in")
+        self.assertIn("/profile", c.get("/calendar").headers["Location"])
+
 
 if __name__ == "__main__":
     unittest.main()

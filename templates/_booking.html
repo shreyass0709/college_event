@@ -8,8 +8,15 @@
       <span>🕒 {{ b.start_t }} – {{ b.end_t }}</span>
       <span>👥 {{ b.attendees }}{% if b.capacity %} / {{ b.capacity }}{% endif %}</span>
       {% if b.organizer %}<span>🏛 {{ b.organizer }}</span>{% endif %}
-      {% if b.uname %}<span>✉ {{ b.uname }} · {{ b.email }}</span>{% endif %}
     </div>
+    {% if b.uname %}
+    <div class="requester">
+      <b>{{ b.uname }}</b> · {{ b.utype or 'Member' }}{% if b.udept %}, {{ b.udept }}{% endif %}
+      {% if b.id_no %} · {{ b.id_no }}{% endif %} · <a href="mailto:{{ b.email }}">{{ b.email }}</a>
+      {% if b.phone %} · <a href="tel:{{ b.phone }}">📞 {{ b.phone }}</a>{% endif %}
+    </div>
+    {% endif %}
+    {% if b.status == 'pending' and b.approver %}<p class="awaiting">⏳ Awaiting approval from {{ b.approver }}</p>{% endif %}
     {% if b.description %}<p class="desc">{{ b.description }}</p>{% endif %}
     {% if b.note %}<span class="note">Admin note: {{ b.note }}</span>{% endif %}
   </div>

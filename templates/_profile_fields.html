@@ -1,0 +1,34 @@
+{# required candidate details; expects `form` (request.form or the user row) #}
+<div class="field"><label for="name">Full name</label>
+  <input id="name" name="name" value="{{ form.name or '' }}" maxlength="80" required autocomplete="name"></div>
+<div class="grid2">
+  <div class="field"><label for="utype">I am a</label>
+    <select id="utype" name="utype" required>
+      <option value="">Select…</option>
+      {% for t in USER_TYPES %}<option {{ 'selected' if form.utype == t }}>{{ t }}</option>{% endfor %}
+    </select></div>
+  <div class="field"><label for="dept">Department</label>
+    <select id="dept" name="dept" required>
+      <option value="">Select…</option>
+      {% for code, label in DEPTS %}<option value="{{ code }}" {{ 'selected' if form.dept == code }}>{{ label }}</option>{% endfor %}
+    </select></div>
+</div>
+<div class="grid2">
+  <div class="field"><label for="id_no" id="id_label">{{ 'USN' if form.utype == 'Student' else 'USN / Employee ID' }}</label>
+    <input id="id_no" name="id_no" value="{{ form.id_no or '' }}" maxlength="20" required pattern="[A-Za-z0-9\/\-]{3,20}"
+           placeholder="e.g. NNM22IS001" style="text-transform:uppercase"></div>
+  <div class="field"><label for="phone">Mobile number</label>
+    <input id="phone" name="phone" type="tel" value="{{ form.phone or '' }}" required inputmode="numeric"
+           pattern="(\+91)?[6-9][0-9]{9}" placeholder="10-digit mobile" autocomplete="tel"></div>
+</div>
+<script>
+  (() => {
+    const t = document.getElementById('utype'), l = document.getElementById('id_label'), i = document.getElementById('id_no');
+    const sync = () => {
+      const s = t.value === 'Student';
+      l.textContent = s ? 'USN' : t.value ? 'Employee ID' : 'USN / Employee ID';
+      i.placeholder = s ? 'e.g. NNM22IS001' : 'e.g. EMP1234';
+    };
+    t.addEventListener('change', sync); sync();
+  })();
+</script>

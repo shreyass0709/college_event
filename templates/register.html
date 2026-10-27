@@ -14,13 +14,10 @@
       <h1>Create account</h1>
       <p class="sub">We'll send a 6-digit code to verify your email.</p>
       <form class="form" method="post">
-        <div class="field"><label for="name">Full name</label>
-          <input id="name" name="name" value="{{ form.get('name', '') }}" required autocomplete="name"></div>
         <div class="field"><label for="email">College email</label>
-          <input id="email" name="email" type="email" value="{{ form.get('email', '') }}" placeholder="4nm22is001@nmamit.in" required
+          <input id="email" name="email" type="email" value="{{ form.get('email', '') }}" placeholder="nnm22is001@nmamit.in" required
                  pattern=".+@(nmamit\.in|nitte\.edu\.in)" title="Use your @nmamit.in or @nitte.edu.in email" autocomplete="username"></div>
-        <div class="field"><label for="dept">Department / Club</label>
-          <input id="dept" name="dept" value="{{ form.get('dept', '') }}" placeholder="e.g. ISE, CSE, IEEE SB"></div>
+        {% include "_profile_fields.html" %}
         <div class="field"><label for="password">Password</label>
           <input id="password" name="password" type="password" minlength="8" required autocomplete="new-password">
           <small>At least 8 characters.</small></div>

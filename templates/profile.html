@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}My Profile · NMAMIT{% endblock %}
+{% block content %}
+<section class="wrap">
+  <div class="section-title"><h2>My Profile</h2></div>
+  <div class="profile-layout">
+    <aside class="card profile-card">
+      <div class="avatar big">{{ (g.user.name.split()|map('first')|join|upper)[:2] }}</div>
+      <h3>{{ g.user.name }}</h3>
+      <p class="muted">{{ g.user.email }}</p>
+      <div class="chips" style="justify-content:center">
+        <span class="pill {{ 'approved' if g.user.role == 'admin' else 'pending' }}">{{ 'Admin' if g.user.role == 'admin' else g.user.utype or 'Member' }}</span>
+        {% if managed %}<span class="pill approved">Venue in-charge</span>{% endif %}
+      </div>
+      <dl class="facts">
+        <dt>Department</dt><dd>{{ DEPT_NAMES.get(g.user.dept, '—') }}</dd>
+        <dt>{{ 'USN' if g.user.utype == 'Student' else 'Employee ID' }}</dt><dd>{{ g.user.id_no or '—' }}</dd>
+        <dt>Mobile</dt><dd>{{ g.user.phone or '—' }}</dd>
+      </dl>
+      <div class="mini-stats">
+        <div><b>{{ stats.get('approved', 0) }}</b><span>Approved</span></div>
+        <div><b>{{ stats.get('pending', 0) }}</b><span>Pending</span></div>
+        <div><b>{{ stats.get('rejected', 0) + stats.get('cancelled', 0) }}</b><span>Closed</span></div>
+      </div>
+      {% if managed %}
+      <p class="eyebrow" style="margin-top:20px">You approve requests for</p>
+      <div class="chips" style="justify-content:center">{% for v in managed %}<span class="chip"><i class="dot" style="background:{{ v.color }};width:8px;height:8px"></i> {{ v.name }}</span>{% endfor %}</div>
+      {% endif %}
+      <a class="btn btn-red btn-block" style="margin-top:22px" href="{{ url_for('logout') }}">Log out</a>
+    </aside>
+
+    <div class="profile-forms">
+      <form class="card form" method="post">
+        <div><p class="eyebrow">Personal details</p><h3>Edit profile</h3></div>
+        <div class="field"><label>College email</label><input value="{{ g.user.email }}" disabled>
+          <small>Email can't be changed. It's your verified college identity.</small></div>
+        {% include "_profile_fields.html" %}
+        <button class="btn btn-navy" name="action" value="profile">Save changes</button>
+      </form>
+
+      <form class="card form" method="post">
+        <div><p class="eyebrow">Security</p><h3>Change password</h3></div>
+        <div class="field"><label for="current">Current password</label>
+          <input id="current" name="current" type="password" required autocomplete="current-password"></div>
+        <div class="grid2">
+          <div class="field"><label for="new">New password</label>
+            <input id="new" name="new" type="password" minlength="8" required autocomplete="new-password"></div>
+          <div class="field"><label for="confirm">Confirm new password</label>
+            <input id="confirm" name="confirm" type="password" minlength="8" required autocomplete="new-password"></div>
+        </div>
+        <button class="btn btn-outline" name="action" value="password">Update password</button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

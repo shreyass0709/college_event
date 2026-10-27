@@ -1,55 +1,46 @@
 {% extends "base.html" %}
 {% block title %}Admin Panel · NMAMIT{% endblock %}
 {% block content %}
-{% set today = '0000' %}
 <section class="wrap">
-  <div class="section-title"><h2>Admin Panel</h2><span class="muted">Review requests and manage venues</span></div>
+  <div class="section-title"><h2>Admin Panel</h2><a class="btn btn-navy btn-sm" href="{{ url_for('approvals') }}">Review requests</a></div>
   <div class="kpis">
-    <div class="kpi"><b>{{ pending|length }}</b><span>Pending requests</span></div>
-    <div class="kpi"><b>{{ upcoming|length }}</b><span>Upcoming approved</span></div>
+    <div class="kpi"><b>{{ stats.pending }}</b><span>Pending requests</span></div>
+    <div class="kpi"><b>{{ stats.upcoming }}</b><span>Upcoming approved</span></div>
     <div class="kpi"><b>{{ venues|selectattr('active')|list|length }}</b><span>Active venues</span></div>
-    <div class="kpi"><b>{{ users }}</b><span>Verified users</span></div>
+    <div class="kpi"><b>{{ stats.users }}</b><span>Verified users</span></div>
   </div>
 
-  <div class="section-title"><h2>Pending requests</h2></div>
-  {% if pending %}
-  <div class="blist">
-    {% for b in pending %}
-      {% set actions = [('Approve', 'approve', 'btn-green'), ('Reject', 'reject', 'btn-red')] %}
-      {% include "_booking.html" %}
-    {% endfor %}
-  </div>
-  {% else %}<div class="card empty"><b>All caught up 🎉</b>No requests waiting for review.</div>{% endif %}
-
-  <div class="section-title"><h2>Upcoming approved events</h2></div>
-  {% if upcoming %}
-  <div class="blist">
-    {% for b in upcoming %}
-      {% set actions = [('Cancel', 'cancel', 'btn-red')] %}
-      {% include "_booking.html" %}
-    {% endfor %}
-  </div>
-  {% else %}<div class="card empty"><b>Nothing scheduled</b>Approved upcoming events will appear here.</div>{% endif %}
-
-  <div class="section-title" id="venues"><h2>Venues</h2></div>
+  <div class="section-title" id="venues"><h2>Venues &amp; in-charges</h2>
+    <span class="muted">The in-charge approves that venue's requests. If none is set, the Admin does.</span></div>
   <div class="card">
     <form class="venue-form" method="post" action="{{ url_for('add_venue') }}">
       <div class="field"><label>Name</label><input name="name" required placeholder="Seminar Hall - Civil"></div>
       <div class="field"><label>Building</label><input name="building" placeholder="Civil Block"></div>
       <div class="field"><label>Capacity</label><input name="capacity" type="number" min="1" required></div>
       <div class="field"><label>Facilities (comma separated)</label><input name="facilities" placeholder="Projector,AC,Sound System"></div>
+      <div class="field"><label>In-charge</label>
+        <select name="incharge_id"><option value="">Admin</option>
+          {% for u in users %}<option value="{{ u.id }}">{{ u.name }} ({{ u.email }})</option>{% endfor %}
+        </select></div>
       <div class="field"><label>Colour</label><input name="color" type="color" value="#2b2f8f"></div>
       <button class="btn btn-navy">Add venue</button>
     </form>
     <div class="table-scroll">
       <table class="vt">
-        <thead><tr><th>Venue</th><th>Building</th><th>Capacity</th><th>Facilities</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Venue</th><th>Capacity</th><th>In-charge (approver)</th><th>Status</th><th></th></tr></thead>
         <tbody>
         {% for v in venues %}
           <tr class="{{ '' if v.active else 'off' }}">
-            <td><i class="dot" style="background:{{ v.color }};margin-right:8px"></i><b>{{ v.name }}</b></td>
-            <td>{{ v.building }}</td><td>{{ v.capacity }}</td>
-            <td>{{ v.facilities.replace(',', ', ') }}</td>
+            <td><i class="dot" style="background:{{ v.color }};margin-right:8px"></i><b>{{ v.name }}</b><br><span class="muted" style="font-size:.76rem">{{ v.building }} · {{ v.facilities.replace(',', ', ') }}</span></td>
+            <td>{{ v.capacity }}</td>
+            <td>
+              <form method="post" action="{{ url_for('set_incharge', vid=v.id) }}" class="incharge-form">
+                <select name="incharge_id" onchange="this.form.submit()" aria-label="In-charge for {{ v.name }}">
+                  <option value="">Admin</option>
+                  {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if u.id == v.incharge_id }}>{{ u.name }} · {{ u.utype or '' }} {{ u.dept or '' }}</option>{% endfor %}
+                </select>
+              </form>
+            </td>
             <td><span class="pill {{ 'approved' if v.active else 'cancelled' }}">{{ 'Active' if v.active else 'Disabled' }}</span></td>
             <td><form method="post" action="{{ url_for('toggle_venue', vid=v.id) }}"><button class="btn btn-sm {{ 'btn-red' if v.active else 'btn-outline' }}">{{ 'Disable' if v.active else 'Enable' }}</button></form></td>
           </tr>

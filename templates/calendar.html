@@ -78,9 +78,9 @@ function showEvent(e) {
     row('Venue', p.venue) +
     row('When', `${e.start.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}, ${t12(hm(e.start))} – ${t12(hm(e.end))}`) +
     row('Organizer', p.organizer) + row('Attendees', p.attendees) +
-    row('Booked by', `${p.by} (${p.email})`) + row('About', p.description);
+    row('Booked by', `${p.by} (${p.email})`) + row('Approver', p.incharge) + row('About', p.description);
   const c = $('#ev-cancel');
-  c.classList.toggle('hidden', !(p.mine || {{ 'true' if g.user.role == 'admin' else 'false' }}) || e.start < new Date());
+  c.classList.toggle('hidden', !p.can_cancel || e.start < new Date());
   c.onclick = () => act(e.id, 'cancel');
   $('#ev').showModal();
 }
